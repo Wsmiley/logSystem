@@ -1,0 +1,147 @@
+package main
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/Shopify/sarama"
+	client "github.com/influxdata/influxdb1-client/v2"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/disk"
+	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/net"
+	"github.com/sirupsen/logrus"
+)
+
+var (
+	cli                    client.Client
+	lastNetIOStatTimeStamp int64    //上一次获取net io数据时间点
+	lastNetInfo            *NetInfo //上一次net io 数据
+)
+
+func initconnInflux() (err error) {
+	cli, err = client.NewHTTPClient(client.HTTPConfig{
+		Addr:     "http://127.0.0.1:8086",
+		Username: "admin",
+		Password: "",
+	})
+	return
+}
+
+func getCpuInfo(topic string) {
+	var cpuInfo = new(CpuInfo)
+	// CPU使用率
+	percent, _ := cpu.Percent(time.Second, false)
+	fmt.Printf("cpu percent:%v\n", percent)
+	// insert
+	cpuInfo.CpuPercent = percent[0]
+	msg := &sarama.ProducerMessage{}
+	msg.Topic = topic
+	cpuP := fmt.Sprintf("%f", cpuInfo.CpuPercent)
+	msg.Value = sarama.StringEncoder(cpuP)
+	toMsgChan(msg)
+	// writesCpuPoints(cpuInfo)
+
+}
+
+// mem info
+func getMemInfo(topic string) {
+	var memInfo = new(MemInfo)
+	info, _ := mem.VirtualMemory()
+	memInfo.Total = info.Total
+	memInfo.Available = info.Available
+	memInfo.Used = info.Used
+	memInfo.UsedPercent = info.UsedPercent
+	memInfo.Buffers = info.Buffers
+	memInfo.Cached = info.Cached
+
+	// msg := &sarama.ProducerMessage{}
+	// msg.Topic = topic
+
+	// msg.Value = sarama.StringEncoder()
+	// toMsgChan(msg)
+	// writesMemPoints(memInfo)
+}
+
+// disk info
+func getDiskInfo() {
+	var diskInfo = &DiskInfo{
+		PartitionUsageStat: make(map[string]*disk.UsageStat, 16),
+	}
+	parts, _ := disk.Partitions(true)
+	for _, part := range parts {
+		//拿到每一个分区信息
+		usageStat, err := disk.Usage(part.Mountpoint)
+		if err != nil {
+			fmt.Printf("get %s usagestat faild,err:%v", err)
+			continue
+		}
+		diskInfo.PartitionUsageStat[part.Mountpoint] = usageStat
+	}
+	// writesDiskPoints(diskInfo)
+}
+
+func getNetInfo() {
+	var netInfo = &NetInfo{
+		NetIOCountersStat: make(map[string]*IOStat, 8),
+	}
+	netIOs, err := net.IOCounters(true)
+	if err != nil {
+		fmt.Printf("get net io counters faild,err:%v", err)
+		return
+	}
+	currentTimeStamp := time.Now().Unix()
+	for _, netIO := range netIOs {
+		var ioStat = new(IOStat)
+
+		//记录发收包数据
+		ioStat.BytesSent = netIO.BytesSent
+		ioStat.BytesRecv = netIO.BytesRecv
+		ioStat.PacketsSent = netIO.PacketsSent
+		ioStat.PacketsRecv = netIO.PacketsRecv
+
+		//将具体网卡数据的ioStat变量添加到Map中
+		netInfo.NetIOCountersStat[netIO.Name] = ioStat
+
+		//计算相关速率
+		//第一次计算跳过
+		if lastNetIOStatTimeStamp == 0 || lastNetInfo == nil {
+			continue
+		}
+		//计算时间间隔
+		interval := currentTimeStamp - lastNetIOStatTimeStamp
+		//计算速率
+		ioStat.BytesSentRate = (float64(ioStat.BytesSent) - float64(lastNetInfo.NetIOCountersStat[netIO.Name].BytesSent)) / float64(interval)
+		ioStat.BytesRecvRate = (float64(ioStat.BytesRecv) - float64(lastNetInfo.NetIOCountersStat[netIO.Name].BytesRecv)) / float64(interval)
+		ioStat.PacketsSentRate = (float64(ioStat.PacketsSent) - float64(lastNetInfo.NetIOCountersStat[netIO.Name].PacketsSent)) / float64(interval)
+		ioStat.PacketsRecvRate = (float64(ioStat.PacketsRecv) - float64(lastNetInfo.NetIOCountersStat[netIO.Name].PacketsRecv)) / float64(interval)
+
+	}
+	lastNetIOStatTimeStamp = currentTimeStamp //更新时间
+	lastNetInfo = netInfo
+	// writesNetPoints(netInfo)
+
+}
+
+func run(interval time.Duration) {
+	ticker := time.Tick(interval)
+	for _ = range ticker {
+		getCpuInfo("CpuInfo")
+		// getMemInfo()
+		// getDiskInfo()
+		// getNetInfo()
+	}
+}
+
+func main() {
+	err := initconnInflux()
+	if err != nil {
+		fmt.Printf("connect to influxDB failed,err%:v", err)
+	}
+	err = initKafka([]string{"127.0.0.1:9092"}, 100000)
+	if err != nil {
+		fmt.Printf("init kafka failed,err%:v", err)
+	}
+	logrus.Info("init kafka success!")
+	run(time.Second)
+}

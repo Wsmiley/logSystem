@@ -1,0 +1,8 @@
+*.exe
+default.etcd
+.vscode
+logs
+WebLogAnalyse
+
+docker/kafka/
+docker/zookeeper/

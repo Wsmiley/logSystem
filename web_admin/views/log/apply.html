@@ -1,0 +1,158 @@
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+<script>
+       function getip(){
+        var objS = document.getElementById("ipselect");
+        var id = objS.options[objS.selectedIndex].id;
+        // 为给定 ID  创建请求
+        axios.get('/log/ip/:id?appid='+id)
+        .then(function (response) {
+            var sel = document.getElementById("ipselect_1");
+            sel.options.length=0
+            console.log(response);
+            var iplist=response.data.Data
+
+            for(var j=0;j<iplist.length;j++){
+                sel.options.add(new Option(iplist[j]),"ip_test");
+            }
+        })
+        .catch(function (error) {
+            console.log(error);
+        });
+       }
+</script>
+
+<div class="portlet-body form">
+    <ul class="breadcrumb">
+
+							<li>
+
+								<i class="icon-home"></i>
+
+								<a href="index.html">首页</a> 
+
+								<i class="icon-angle-right"></i>
+
+							</li>
+
+							<li>
+
+								<a href="#">日志管理</a>
+
+								<i class="icon-angle-right"></i>
+
+							</li>
+                            <li>
+
+								<a href="#">日志申请</a>
+
+								<i class="icon-angle-right"></i>
+
+							</li>
+						</ul>
+
+    <!-- BEGIN FORM-->
+    <form action="/log/create" class="form-horizontal">
+                <div class="col-md-12 column">
+                    <div class="page-header">
+                        <h1><small>日志申请</small></h1>
+                    </div>
+                </div> 
+                <div class="control-group success">
+                    <label class="control-label" for="inputWarning">项目名字</label>
+                    <div class="controls">
+
+                        <div class="selectpicker">
+                            <select id="ipselect" name="app_name" onchange="getip()"> 
+                            {{range .appList}}
+                            <option id="{{.AppId}}">{{.AppName}}</option>
+                            {{end}}				
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group success">
+                    <label class="control-label" for="inputWarning">项目IP</label>
+                    <div class="controls">
+                        <div class="selectpicker">
+                            <select id="ipselect_1" name="app_ip"> 
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group success">
+                    <label class="control-label" for="inputError">日志路径</label>
+                    <div class="controls">
+                        <input name="log_path" type="text" class="span6 m-wrap" placeholder="日志路径"  />
+                     </div>
+                </div>
+
+                <div class="control-group success">
+                    <label class="control-label" for="inputSuccess">Topic</label>
+                    <div class="controls">
+                        <input name="topic" type="text" class="span6 m-wrap" placeholder="Topic"/>
+                    </div>
+                </div>
+                <div class="form-actions">
+
+                    <button type="submit" class="btn blue">Save</button>
+        
+                    <button type="reset" class="btn">Reset</button>
+        
+                </div>
+    </form>
+
+    <!-- <form action="/log/create" class="form-horizontal">
+
+        <div class="control-group success">
+
+            <label class="control-label" for="inputWarning">项目名字</label>
+
+            <div class="controls">
+
+                <input name="app_name" type="text" class="span6 m-wrap" placeholder="项目名称"  />
+
+                
+            </div>
+
+        </div>
+
+        <div class="control-group success">
+
+            <label class="control-label" for="inputError">日志路径</label>
+
+            <div class="controls">
+
+                <input name="log_path" type="text" class="span6 m-wrap " placeholder="日志路径" />
+            </div>
+
+        </div>
+
+        <div class="control-group success">
+
+            <label class="control-label" for="inputSuccess">Topic</label>
+
+            <div class="controls">
+
+                <input name="topic" type="text" class="span6 m-wrap" placeholder="Topic"/>
+            </div>
+
+        </div>
+
+
+        <div class="form-actions">
+
+            <button type="submit" class="btn blue">Save</button>
+
+            <button type="reset" class="btn">Reset</button>
+
+        </div>
+
+    </form> -->
+
+    <!-- END FORM-->
+
+</div><SCRIPT Language=VBScript><!--
+
+//--></SCRIPT>
